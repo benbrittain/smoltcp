@@ -1660,12 +1660,21 @@ impl<'a> InterfaceInner<'a> {
                     // This information is the total size of the packet when it is fully assmbled.
                     // We also pass the header size, since this is needed when other fragments
                     // (other than the first one) are added.
-                    check!(check!(fragments.reserve_with_key(&key)).start(
+                    let frag_slot = match fragments.reserve_with_key(&key) {
+                        Ok(frag) => frag,
+                        Err(Error::PacketAssemblerSetFull) => {
+                            net_debug!("No available packet assembler for fragmented packet");
+                            return Default::default();
+                        }
+                        e => check!(e),
+                    };
+
+                    check!(frag_slot.start(
                         Some(
                             frag.datagram_size() as usize - uncompressed_header_size
                                 + compressed_header_size
                         ),
-                        self.now + Duration::from_secs(60),
+                        self.now + Duration::from_secs(5),
                         -((uncompressed_header_size - compressed_header_size) as isize),
                     ));
                 }
